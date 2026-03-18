@@ -62,7 +62,12 @@ public class CvUploadService {
 
     /**
      * Processes an uploaded CV file: extracts text via Tika,
-     * overwrites any existing CV for the user, and stores in MongoDB.
+     * parses it into structured fields, and stores in MongoDB.
+     *
+     * If the user already has a resume on file, the current state is
+     * snapshotted into the {@code versions} history list, the version
+     * counter is incremented, and the top-level fields are updated
+     * with the new upload — so nothing is ever deleted.
      */
     public CvDocument processAndStore(MultipartFile file, String userId) throws IOException, TikaException {
         // Validate file
@@ -82,25 +87,68 @@ public class CvUploadService {
 
         log.info("Extracted {} characters from CV file: {}", extractedText.length(), file.getOriginalFilename());
 
-        // Overwrite mechanism: delete any existing CV for this user
-        cvDocumentRepository.deleteByUserId(userId);
-        log.info("Cleared existing CV data for user: {}", userId);
+        // Parse the extracted text into structured fields
+        ContactInfo contactInfo = extractContactInfo(extractedText);
+        List<Experience> experience = extractExperience(extractedText);
+        List<Education> education = extractEducation(extractedText);
+        List<String> skills = extractSkills(extractedText);
 
-        // Parse the extracted text into structured fields (best-effort)
-        CvDocument cvDocument = CvDocument.builder()
-                .userId(userId)
-                .originalText(extractedText)
-                .contactInfo(extractContactInfo(extractedText))
-                .experience(extractExperience(extractedText))
-                .education(extractEducation(extractedText))
-                .skills(extractSkills(extractedText))
-                .tailoredVersions(new ArrayList<>())
-                .originalFileName(file.getOriginalFilename())
-                .fileType(file.getContentType())
-                .lastUpdated(Instant.now())
-                .build();
+        // Check if a document already exists for this user
+        var existingOpt = cvDocumentRepository.findByUserId(userId);
 
-        return cvDocumentRepository.save(cvDocument);
+        if (existingOpt.isPresent()) {
+            // ── Update existing document (version history preserved) ──
+            CvDocument existing = existingOpt.get();
+
+            // Snapshot the current state into the versions list
+            ResumeVersion snapshot = ResumeVersion.builder()
+                    .versionNumber(existing.getCurrentVersion())
+                    .originalText(existing.getOriginalText())
+                    .contactInfo(existing.getContactInfo())
+                    .experience(existing.getExperience())
+                    .education(existing.getEducation())
+                    .skills(existing.getSkills())
+                    .originalFileName(existing.getOriginalFileName())
+                    .fileType(existing.getFileType())
+                    .uploadedAt(existing.getLastUpdated())
+                    .build();
+            existing.getVersions().add(snapshot);
+
+            // Increment version and update top-level fields
+            existing.setCurrentVersion(existing.getCurrentVersion() + 1);
+            existing.setOriginalText(extractedText);
+            existing.setContactInfo(contactInfo);
+            existing.setExperience(experience);
+            existing.setEducation(education);
+            existing.setSkills(skills);
+            existing.setOriginalFileName(file.getOriginalFilename());
+            existing.setFileType(file.getContentType());
+            existing.setLastUpdated(Instant.now());
+            // tailoredVersions are intentionally kept as-is
+
+            log.info("Updated resume for user {} → version {}", userId, existing.getCurrentVersion());
+            return cvDocumentRepository.save(existing);
+
+        } else {
+            // ── First upload for this user ──
+            CvDocument cvDocument = CvDocument.builder()
+                    .userId(userId)
+                    .currentVersion(1)
+                    .originalText(extractedText)
+                    .contactInfo(contactInfo)
+                    .experience(experience)
+                    .education(education)
+                    .skills(skills)
+                    .versions(new ArrayList<>())
+                    .tailoredVersions(new ArrayList<>())
+                    .originalFileName(file.getOriginalFilename())
+                    .fileType(file.getContentType())
+                    .lastUpdated(Instant.now())
+                    .build();
+
+            log.info("Created new resume for user {} → version 1", userId);
+            return cvDocumentRepository.save(cvDocument);
+        }
     }
 
     /**

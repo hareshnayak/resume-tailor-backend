@@ -25,6 +25,12 @@ public class CvDocument {
     @Indexed(unique = true)
     private String userId;
 
+    /** Current/active version number (starts at 1, increments on each re-upload) */
+    @Builder.Default
+    private int currentVersion = 1;
+
+    // ── Latest (active) resume fields ──────────────────────────
+
     private String originalText;
 
     private ContactInfo contactInfo;
@@ -38,11 +44,19 @@ public class CvDocument {
     @Builder.Default
     private List<String> skills = new ArrayList<>();
 
-    @Builder.Default
-    private List<TailoredVersion> tailoredVersions = new ArrayList<>();
-
     private String originalFileName;
     private String fileType;
+
+    // ── Version history ────────────────────────────────────────
+
+    /** Complete history of all resume uploads (oldest → newest) */
+    @Builder.Default
+    private List<ResumeVersion> versions = new ArrayList<>();
+
+    // ── Tailored versions (shared across all resume versions) ──
+
+    @Builder.Default
+    private List<TailoredVersion> tailoredVersions = new ArrayList<>();
 
     @Builder.Default
     private Instant lastUpdated = Instant.now();

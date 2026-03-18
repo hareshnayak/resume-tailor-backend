@@ -47,9 +47,11 @@ public class ResumeController {
 
             CvUploadResponse response = CvUploadResponse.builder()
                     .success(true)
-                    .message("Resume uploaded and parsed successfully")
+                    .message("Resume uploaded and parsed successfully (version " + saved.getCurrentVersion() + ")")
                     .cvId(saved.getId())
                     .userId(saved.getUserId())
+                    .currentVersion(saved.getCurrentVersion())
+                    .totalVersions(saved.getVersions().size() + 1) // history + current
                     .contactInfo(saved.getContactInfo())
                     .experience(saved.getExperience())
                     .education(saved.getEducation())
@@ -81,6 +83,8 @@ public class ResumeController {
                 .message("Resume retrieved successfully")
                 .cvId(doc.getId())
                 .userId(doc.getUserId())
+                .currentVersion(doc.getCurrentVersion())
+                .totalVersions(doc.getVersions().size() + 1)
                 .contactInfo(doc.getContactInfo())
                 .experience(doc.getExperience())
                 .education(doc.getEducation())

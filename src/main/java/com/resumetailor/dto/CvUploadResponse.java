@@ -19,6 +19,8 @@ public class CvUploadResponse {
     private String message;
     private String cvId;
     private String userId;
+    private int currentVersion;
+    private int totalVersions;
     private ContactInfo contactInfo;
     private List<Experience> experience;
     private List<Education> education;
