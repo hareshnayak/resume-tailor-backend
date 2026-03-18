@@ -48,7 +48,7 @@ public class ResumeController {
             CvUploadResponse response = CvUploadResponse.builder()
                     .success(true)
                     .message("Resume uploaded and parsed successfully (version " + saved.getCurrentVersion() + ")")
-                    .cvId(saved.getId())
+                    .resumeId(saved.getId())
                     .userId(saved.getUserId())
                     .currentVersion(saved.getCurrentVersion())
                     .totalVersions(saved.getVersions().size() + 1) // history + current
@@ -58,7 +58,7 @@ public class ResumeController {
                     .skills(saved.getSkills())
                     .build();
 
-            log.info("Resume stored successfully: cvId={}", saved.getId());
+            log.info("Resume stored successfully: resumeId={}", saved.getId());
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
@@ -68,20 +68,20 @@ public class ResumeController {
     }
 
     /**
-     * GET /api/resume/{userId}
+     * GET /api/resume/{resumeId}
      *
      * Retrieves the stored resume for a given user.
      */
-    @GetMapping("/{userId}")
-    public ResponseEntity<CvUploadResponse> getResume(@PathVariable String userId) {
-        log.info("Fetching resume for userId={}", userId);
+    @GetMapping("/{resumeId}")
+    public ResponseEntity<CvUploadResponse> getResume(@PathVariable String resumeId) {
+        log.info("Fetching resume: resumeId={}", resumeId);
 
-        CvDocument doc = cvUploadService.findByUserId(userId);
+        CvDocument doc = cvUploadService.findById(resumeId);
 
         CvUploadResponse response = CvUploadResponse.builder()
                 .success(true)
                 .message("Resume retrieved successfully")
-                .cvId(doc.getId())
+                .resumeId(doc.getId())
                 .userId(doc.getUserId())
                 .currentVersion(doc.getCurrentVersion())
                 .totalVersions(doc.getVersions().size() + 1)
@@ -94,4 +94,3 @@ public class ResumeController {
         return ResponseEntity.ok(response);
     }
 }
-

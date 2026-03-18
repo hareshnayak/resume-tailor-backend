@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 
 /**
- * Controller for AI-powered resume tailoring.
- * Fetches the stored CV from MongoDB, runs it through the AI tailoring
- * pipeline against a job description, and returns tailored text + feedback.
+ * POST /api/tailor — Submit resumeId + jobDescription.
+ * Fetches the stored resume, runs the AI tailoring pipeline,
+ * saves a tailored version to MongoDB, and returns structured JSON + feedback.
  */
 @Slf4j
 @RestController
@@ -32,54 +32,59 @@ public class TailorController {
     /**
      * POST /api/tailor
      *
-     * Accepts a userId and job description text.
-     * Retrieves the user's stored CV from MongoDB, runs the AI tailoring
+     * Accepts a resumeId and job description text.
+     * Retrieves the resume from MongoDB by _id, runs the AI tailoring
      * pipeline (keyword extraction → audit → tailor → feedback),
      * saves the tailored version back to MongoDB, and returns the result.
      *
-     * @param request Contains userId and jobText
+     * @param request Contains resumeId and jobDescription
      * @return TailorResponse with tailored CV text and feedback
      */
     @PostMapping
     public ResponseEntity<TailorResponse> tailorResume(
             @Valid @RequestBody TailorRequest request) {
 
-        log.info("Tailor request received: userId={}", request.getUserId());
+        log.info("Tailor request: resumeId={}", request.getResumeId());
 
         try {
-            // Step 1: Fetch stored CV from MongoDB
-            CvDocument cvDocument = cvDocumentRepository.findByUserId(request.getUserId())
+            // Step 1: Fetch stored resume from MongoDB by _id
+            CvDocument cvDocument = cvDocumentRepository.findById(request.getResumeId())
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "No resume found for userId: " + request.getUserId()
-                                    + ". Please upload a resume first via /api/resume/upload"));
+                            "No resume found for resumeId: " + request.getResumeId()
+                                    + ". Upload a resume first via POST /api/resume/upload"));
 
-            String cvText = cvDocument.getOriginalText();
-            log.info("Retrieved stored CV for user: {} ({} chars)", request.getUserId(), cvText.length());
+            log.info("Retrieved resume: resumeId={}, version={}, {} chars",
+                    cvDocument.getId(), cvDocument.getCurrentVersion(),
+                    cvDocument.getOriginalText().length());
 
             // Step 2: Run the AI tailoring pipeline
-            log.info("Running AI tailoring pipeline...");
-            TailorResponse response = aiTailoringService.tailorCv(cvText, request.getJobText());
+            TailorResponse response = aiTailoringService.tailorCv(cvDocument, request.getJobDescription());
 
             // Step 3: Save the tailored version back to MongoDB
             TailoredVersion version = TailoredVersion.builder()
+                    .resumeVersionNumber(cvDocument.getCurrentVersion())
                     .tailoredText(response.getTailoredCvText())
+                    .tailoredExperience(response.getTailoredExperience())
+                    .tailoredSkills(response.getTailoredSkills())
+                    .missingKeywordsAddressed(response.getMissingKeywords())
                     .feedback(response.getFeedback())
+                    .createdAt(Instant.now())
                     .build();
 
             cvDocument.getTailoredVersions().add(version);
             cvDocument.setLastUpdated(Instant.now());
             cvDocumentRepository.save(cvDocument);
-            log.info("Tailored version saved to MongoDB for user: {}", request.getUserId());
 
-            log.info("Tailoring completed successfully");
+            log.info("Tailored version #{} saved for resumeId={}",
+                    cvDocument.getTailoredVersions().size(), cvDocument.getId());
+
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
-            throw e; // let GlobalExceptionHandler handle it as 400
+            throw e;
         } catch (Exception e) {
             log.error("Resume tailoring failed: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to tailor resume: " + e.getMessage(), e);
         }
     }
 }
-

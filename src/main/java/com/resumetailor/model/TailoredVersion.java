@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -12,11 +13,20 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TailoredVersion {
+
+    /** Which resume version (CvDocument.currentVersion) this was tailored from */
+    private int resumeVersionNumber;
+
     private String jobTitle;
     private String company;
+    private String jobUrl;
+
     private String tailoredText;
     private List<Experience> tailoredExperience;
+    private List<String> tailoredSkills;
     private List<String> missingKeywordsAddressed;
     private String feedback;
-    private String jobUrl;
+
+    @Builder.Default
+    private Instant createdAt = Instant.now();
 }

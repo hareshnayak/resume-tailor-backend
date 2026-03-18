@@ -17,7 +17,7 @@ import java.util.List;
 public class CvUploadResponse {
     private boolean success;
     private String message;
-    private String cvId;
+    private String resumeId;
     private String userId;
     private int currentVersion;
     private int totalVersions;

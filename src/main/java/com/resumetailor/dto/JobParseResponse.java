@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class JobParseResponse {
     private boolean success;
+    private String jobId;
+    private String jobUrl;
     private String jobDescriptionText;
     private String jobTitle;
     private String company;

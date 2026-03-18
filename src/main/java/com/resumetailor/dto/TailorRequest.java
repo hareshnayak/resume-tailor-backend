@@ -9,9 +9,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TailorRequest {
-    @NotBlank(message = "User ID is required")
-    private String userId;
+
+    @NotBlank(message = "Resume ID is required. Upload a resume first via /api/resume/upload")
+    private String resumeId;
 
     @NotBlank(message = "Job description text is required")
-    private String jobText;
+    private String jobDescription;
 }

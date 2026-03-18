@@ -2,6 +2,8 @@ package com.resumetailor.controller;
 
 import com.resumetailor.dto.JobParseRequest;
 import com.resumetailor.dto.JobParseResponse;
+import com.resumetailor.model.JobDocument;
+import com.resumetailor.repository.JobDocumentRepository;
 import com.resumetailor.service.JobParsingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,9 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controller for parsing job postings.
- * Uses Playwright (headless Chromium) to render JS-heavy pages,
- * then Jsoup to extract the clean job description text.
+ * POST /api/job/parse — Scrape a job URL, save to MongoDB "jobs" collection, return jobId + text.
+ * GET  /api/job/{jobId} — Retrieve a previously scraped job by its MongoDB _id.
  */
 @Slf4j
 @RestController
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class JobController {
 
     private final JobParsingService jobParsingService;
+    private final JobDocumentRepository jobDocumentRepository;
 
     /**
      * POST /api/job/parse
@@ -36,19 +38,30 @@ public class JobController {
     public ResponseEntity<JobParseResponse> parseJobUrl(
             @Valid @RequestBody JobParseRequest request) {
 
-        log.info("Job parse request received: jobUrl={}", request.getJobUrl());
+        log.info("Job parse request: jobUrl={}", request.getJobUrl());
 
         try {
             String jobText = jobParsingService.scrapeJobDescription(request.getJobUrl());
             String jobTitle = jobParsingService.extractJobTitle(request.getJobUrl());
 
+            // Persist to MongoDB
+            JobDocument saved = jobDocumentRepository.save(
+                    JobDocument.builder()
+                            .jobUrl(request.getJobUrl())
+                            .jobTitle(jobTitle)
+                            .jobDescriptionText(jobText)
+                            .build()
+            );
+
             JobParseResponse response = JobParseResponse.builder()
                     .success(true)
+                    .jobId(saved.getId())
+                    .jobUrl(saved.getJobUrl())
                     .jobDescriptionText(jobText)
                     .jobTitle(jobTitle)
                     .build();
 
-            log.info("Job description extracted successfully: {} chars", jobText.length());
+            log.info("Job saved: jobId={}, {} chars", saved.getId(), jobText.length());
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
@@ -56,5 +69,23 @@ public class JobController {
             throw new RuntimeException("Failed to parse job URL: " + e.getMessage(), e);
         }
     }
-}
 
+    @GetMapping("/{jobId}")
+    public ResponseEntity<JobParseResponse> getJob(@PathVariable String jobId) {
+        log.info("Fetching job: jobId={}", jobId);
+
+        JobDocument doc = jobDocumentRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("No job found for jobId: " + jobId));
+
+        JobParseResponse response = JobParseResponse.builder()
+                .success(true)
+                .jobId(doc.getId())
+                .jobUrl(doc.getJobUrl())
+                .jobDescriptionText(doc.getJobDescriptionText())
+                .jobTitle(doc.getJobTitle())
+                .company(doc.getCompany())
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+}

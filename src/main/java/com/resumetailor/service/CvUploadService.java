@@ -28,6 +28,17 @@ public class CvUploadService {
     private final Tika tika = new Tika();
 
     /**
+     * Retrieves a stored CvDocument by its MongoDB _id (resumeId).
+     *
+     * @throws IllegalArgumentException if no resume is found for the given id
+     */
+    public CvDocument findById(String resumeId) {
+        return cvDocumentRepository.findById(resumeId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No resume found for resumeId: " + resumeId));
+    }
+
+    /**
      * Retrieves a stored CvDocument by userId.
      *
      * @throws IllegalArgumentException if no resume is found for the userId
